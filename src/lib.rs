@@ -19,16 +19,16 @@ pub struct Header {
     pub additional_count: u16, // 16 bits   number of records in the additional section.
 }
 
+// Turns off clippy lint for concatenate |= (header.response_code as u16 & 0x0F) << 0;
+#[allow(clippy::identity_op)]
 pub fn serialize_header(header: &Header) -> Vec<u8> {
-    // Create the full buffer
-    // header only uses 12 bytes of the buffer
+    // Create the header buffer with a length of 12 bytes
     // 0 bytes | 12 bytes
-    let mut buf = BytesMut::with_capacity(512);
+    let mut buf = BytesMut::with_capacity(96);
 
     // 2 bytes | 10 bytes
     buf.put_u16(header.id);
 
-    // 2 bytes | 08 bytes
     let mut concatenate = 0u16;
     // 1000000000000000
     concatenate |= (header.query as u16) << 15;
@@ -46,6 +46,8 @@ pub fn serialize_header(header: &Header) -> Vec<u8> {
     concatenate |= (header.reserved as u16 & 0x07) << 4;
     // 0000000000001111
     concatenate |= (header.response_code as u16 & 0x0F) << 0;
+
+    // 2 bytes | 08 bytes
     buf.put_u16(concatenate);
 
     // 8 bytes | 0 bytes
