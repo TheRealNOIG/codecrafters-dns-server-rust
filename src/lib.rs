@@ -69,8 +69,6 @@ impl Header {
     // Turns off clippy lint for concatenate |= (self.response_code as u16 & 0x0F) << 0;
     #[allow(clippy::identity_op)]
     pub fn serialize(&self) -> Vec<u8> {
-        // TODO: explicitly set ints to big indian
-
         // 0 bytes | 12 bytes
         let mut buf = BytesMut::with_capacity(96);
 
@@ -124,15 +122,10 @@ impl Question {
         }
     }
     pub fn serialize(&self) -> Vec<u8> {
-        // TODO: explicitly set ints to big indian
-        // Create butter | labels 63 bytes | record type 2 bytes | class 2 bytes
-        let mut buf = BytesMut::with_capacity(536);
+        // Create butter 512 < | labels 63 bytes | record type 2 bytes | class 2 bytes
+        let mut buf = BytesMut::with_capacity(512);
 
-        for (label, length) in &self.name.labels {
-            buf.put_u8(*length);
-            buf.put(label.as_bytes());
-        }
-        buf.put_u8(0);
+        buf.put_slice(self.name.serialize().as_slice());
 
         buf.put_u16(RecordType::value(&self.record_type));
         buf.put_u16(self.class);
@@ -142,7 +135,7 @@ impl Question {
 }
 
 //https://datatracker.ietf.org/doc/html/rfc1035#section-3.1
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LabelSequence {
     pub labels: Vec<(String, u8)>,
 }
@@ -165,6 +158,60 @@ impl LabelSequence {
             .collect::<Result<Vec<(String, u8)>, String>>()?;
 
         Ok(LabelSequence { labels })
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        let mut buf = BytesMut::with_capacity(512);
+
+        for (label, length) in &self.labels {
+            buf.put_u8(*length);
+            buf.put(label.as_bytes());
+        }
+        buf.put_u8(0);
+
+        buf.to_vec()
+    }
+}
+
+//https://datatracker.ietf.org/doc/html/rfc1035#section-3.2
+#[derive(Debug)]
+pub struct Record {
+    pub name: LabelSequence, //an owner name, i.e., the name of the node to which this resource record pertains
+    pub record_type: RecordType,
+    pub class: u16,
+    pub ttl: u32,
+    pub length: u16,
+    pub data: Vec<u8>,
+}
+impl Record {
+    pub fn new(
+        name: LabelSequence,
+        record_type: RecordType,
+        data: Vec<u8>,
+        ttl: Option<u32>,
+    ) -> Record {
+        Record {
+            name,
+            record_type,
+            class: 1, // always set to 1 for (internet) https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4
+            ttl: ttl.unwrap_or(60),
+            length: data.len() as u16,
+            data,
+        }
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        // Create buffer 512 < | labels 63 bytes | record type 2 bytes | class 2 bytes | ttl 4 bytes | length 2 bytes | data length
+        let mut buf = BytesMut::with_capacity(512);
+
+        buf.put_slice(self.name.serialize().as_slice());
+        buf.put_u16(self.record_type.value());
+        buf.put_u16(self.class);
+        buf.put_u32(self.ttl);
+        buf.put_u16(self.length);
+        buf.put_slice(&self.data);
+
+        buf.to_vec()
     }
 }
 

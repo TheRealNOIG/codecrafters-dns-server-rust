@@ -1,4 +1,4 @@
-use dns_starter_rust::{Header, LabelSequence, Question, RecordType};
+use dns_starter_rust::{Header, LabelSequence, Question, Record, RecordType};
 use std::net::UdpSocket;
 
 fn main() {
@@ -17,8 +17,9 @@ fn main() {
                     print!("{:02x} ", byte);
                 }
                 println!(); // Add a newline after printing all bytes
-                let response = test_response().unwrap();
 
+                let response = test_response().unwrap();
+                println!("Response HAUKRSATKSrAKTEKST: {:?}", response);
                 // TODO: check if response is over 512 bytes and truncate it if so
                 udp_socket
                     .send_to(&response, source)
@@ -44,14 +45,30 @@ fn test_response() -> Result<Vec<u8>, String> {
         reserved: 0,
         response_code: 0,
         question_count: 1,
-        answer_count: 0,
+        answer_count: 1,
         authority_count: 0,
         additional_count: 0,
     };
+    println!("Header: {:?}", header);
+    println!("Header: {:?}", header.serialize());
 
     let label_sequence = LabelSequence::new(vec!["codecrafters".to_string(), "io".to_string()])?;
-    let question = Question::new(label_sequence, RecordType::A);
 
-    Ok([header.serialize(), question.serialize()].concat())
+    let question = Question::new(label_sequence.clone(), RecordType::A);
+    println!("Question: {:?}", question);
+    println!("Question: {:?}", question.serialize());
+
+    let answer = Record::new(
+        label_sequence.clone(),
+        RecordType::A,
+        vec![8, 8, 8, 8],
+        None,
+    );
+    println!("Answer: {:?}", answer);
+    println!("Answer: {:?}", answer.serialize());
+
+    let response = [header.serialize(), question.serialize(), answer.serialize()].concat();
+    println!("Response: {:?}", &response);
+    Ok(response)
 }
 
