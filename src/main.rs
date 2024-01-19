@@ -1,4 +1,4 @@
-use dns_starter_rust::{Header, LabelSequence, Question, Record, RecordType};
+use dns_starter_rust::{Header, Question, Record};
 use std::net::UdpSocket;
 
 fn main() {
@@ -18,7 +18,7 @@ fn main() {
                 }
                 println!(); // Add a newline after printing all bytes
 
-                let response = response(&buf).unwrap();
+                let response = response(&buf[..size]).unwrap();
 
                 // TODO: check if response is over 512 bytes and truncate it if so
                 udp_socket
@@ -34,8 +34,11 @@ fn main() {
 }
 
 fn response(buf: &[u8]) -> Result<Vec<u8>, String> {
-    if let Ok((_, header)) = Header::deserialize(buf) {
-        let output_header = Header {
+    let mut buffer = buf;
+    let output_header: Header;
+    println!("Buffer: {:?}", buffer);
+    if let Ok((buf, header)) = Header::deserialize(buf) {
+        output_header = Header {
             id: header.id,
             query: true,
             op_code: header.op_code,
@@ -50,73 +53,43 @@ fn response(buf: &[u8]) -> Result<Vec<u8>, String> {
             authority_count: 0,
             additional_count: 0,
         };
+        buffer = buf;
         println!("Header: {:?}", output_header);
         println!("Header: {:?}", output_header.serialize());
-
-        let label_sequence =
-            LabelSequence::new(vec!["codecrafters".to_string(), "io".to_string()])?;
-
-        let question = Question::new(label_sequence.clone(), RecordType::A);
-        println!("Question: {:?}", question);
-        println!("Question: {:?}", question.serialize());
-
-        let answer = Record::new(
-            label_sequence.clone(),
-            RecordType::A,
-            vec![8, 8, 8, 8],
-            None,
-        );
-        println!("Answer: {:?}", answer);
-        println!("Answer: {:?}", answer.serialize());
-
-        let response = [
-            output_header.serialize(),
-            question.serialize(),
-            answer.serialize(),
-        ]
-        .concat();
-        println!("Response: {:?}", &response);
-        Ok(response)
     } else {
-        Err("Failed to deserialize header".to_string())
+        return Err("Failed to deserialize header".to_string());
     }
-}
 
-fn _test_response() -> Result<Vec<u8>, String> {
-    let header = Header {
-        id: 1234,
-        query: true,
-        op_code: 0,
-        authoritative_answer: false,
-        truncation: false,
-        recursion_desired: false,
-        recursion_available: false,
-        reserved: 0,
-        response_code: 0,
-        question_count: 1,
-        answer_count: 1,
-        authority_count: 0,
-        additional_count: 0,
-    };
-    println!("Header: {:?}", header);
-    println!("Header: {:?}", header.serialize());
-
-    let label_sequence = LabelSequence::new(vec!["codecrafters".to_string(), "io".to_string()])?;
-
-    let question = Question::new(label_sequence.clone(), RecordType::A);
-    println!("Question: {:?}", question);
-    println!("Question: {:?}", question.serialize());
+    let output_question: Question;
+    println!("Buffer: {:?}", buffer);
+    if let Ok((buf, question)) = Question::deserialize(buffer) {
+        output_question = Question {
+            name: question.name,
+            record_type: question.record_type,
+            class: question.class,
+        };
+        buffer = buf;
+        println!("Question: {:?}", output_question);
+        println!("Question: {:?}", output_question.serialize());
+    } else {
+        return Err("Failed to deserialize question".to_string());
+    }
 
     let answer = Record::new(
-        label_sequence.clone(),
-        RecordType::A,
+        output_question.name.clone(),
+        output_question.record_type.clone(),
         vec![8, 8, 8, 8],
         None,
     );
     println!("Answer: {:?}", answer);
     println!("Answer: {:?}", answer.serialize());
 
-    let response = [header.serialize(), question.serialize(), answer.serialize()].concat();
+    let response = [
+        output_header.serialize(),
+        output_question.serialize(),
+        answer.serialize(),
+    ]
+    .concat();
     println!("Response: {:?}", &response);
     Ok(response)
 }

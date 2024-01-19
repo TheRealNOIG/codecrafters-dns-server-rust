@@ -1,13 +1,20 @@
-// TODO: move structs to there own file (The Book pg: 119-140)
+// TODO: move structs to there own file (The Book pg: 119-1403
 use bytes::{BufMut, BytesMut};
-use nom::{number::complete::be_u16, IResult};
+use nom::{bytes::complete::take, number::complete::be_u16, IResult};
 
 //Info on DNS protocol
 //https://datatracker.ietf.org/doc/html/rfc1035
 //https://github.com/EmilHernvall/dnsguide/blob/b52da3b32b27c81e5c6729ac14fe01fef8b1b593/chapter1.md
 
-// https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.2
 #[derive(Debug)]
+pub struct RecordTypeError;
+impl From<RecordTypeError> for nom::Err<nom::error::Error<&[u8]>> {
+    fn from(_: RecordTypeError) -> Self {
+        nom::Err::Failure(nom::error::Error::new(&[], nom::error::ErrorKind::Tag))
+    }
+}
+// https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.2
+#[derive(Debug, Clone, Copy)]
 pub enum RecordType {
     A = 1,
     NS = 2,
@@ -26,26 +33,33 @@ pub enum RecordType {
     MX = 15,
     TXT = 16,
 }
+impl TryFrom<u16> for RecordType {
+    type Error = RecordTypeError;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(RecordType::A),
+            2 => Ok(RecordType::NS),
+            3 => Ok(RecordType::MD),
+            4 => Ok(RecordType::MF),
+            5 => Ok(RecordType::CNAME),
+            6 => Ok(RecordType::SOA),
+            7 => Ok(RecordType::MB),
+            8 => Ok(RecordType::MG),
+            9 => Ok(RecordType::MR),
+            10 => Ok(RecordType::NULL),
+            11 => Ok(RecordType::WKS),
+            12 => Ok(RecordType::PTR),
+            13 => Ok(RecordType::HINFO),
+            14 => Ok(RecordType::MINFO),
+            15 => Ok(RecordType::MX),
+            16 => Ok(RecordType::TXT),
+            _ => Err(RecordTypeError),
+        }
+    }
+}
 impl RecordType {
     pub fn value(&self) -> u16 {
-        match self {
-            RecordType::A => 1,
-            RecordType::NS => 2,
-            RecordType::MD => 3,
-            RecordType::MF => 4,
-            RecordType::CNAME => 5,
-            RecordType::SOA => 6,
-            RecordType::MB => 7,
-            RecordType::MG => 8,
-            RecordType::MR => 9,
-            RecordType::NULL => 10,
-            RecordType::WKS => 11,
-            RecordType::PTR => 12,
-            RecordType::HINFO => 13,
-            RecordType::MINFO => 14,
-            RecordType::MX => 15,
-            RecordType::TXT => 16,
-        }
+        *self as u16
     }
 }
 
@@ -149,7 +163,7 @@ impl Header {
 pub struct Question {
     pub name: LabelSequence, // Label Sequence  The domain name, encoded as a sequence of labels
     pub record_type: RecordType, // 2 bytes         The record type
-    class: u16, //  2 bytes                     The class, in practice always set to 1 for (internet) https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4
+    pub class: u16, //  2 bytes                     The class, in practice always set to 1 for (internet) https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4
 }
 impl Question {
     pub fn new(name: LabelSequence, record_type: RecordType) -> Question {
@@ -169,6 +183,22 @@ impl Question {
         buf.put_u16(self.class);
 
         buf.to_vec()
+    }
+    pub fn deserialize(data: &[u8]) -> IResult<&[u8], Question> {
+        let (data, name) = LabelSequence::deserialize(data)?;
+        let (data, record_type_num) = be_u16(data)?;
+        let (data, class) = be_u16(data)?;
+
+        let record_type = RecordType::try_from(record_type_num)?;
+
+        Ok((
+            data,
+            Question {
+                name,
+                record_type,
+                class,
+            },
+        ))
     }
 }
 
@@ -209,6 +239,24 @@ impl LabelSequence {
 
         buf.to_vec()
     }
+    //https://docs.rs/nom/latest/nom/bytes/complete/fn.take.html
+    fn deserialize(data: &[u8]) -> IResult<&[u8], LabelSequence> {
+        let mut label_sequence = LabelSequence { labels: Vec::new() };
+        let mut remaining = data;
+
+        while !remaining.is_empty() && remaining[0] != 0 {
+            let (new_remaining, length) = take(1usize)(remaining)?;
+            let (new_remaining, label) = take(length[0] as usize)(new_remaining)?;
+            label_sequence
+                .labels
+                .push((String::from_utf8(label.to_vec()).unwrap(), length[0]));
+            remaining = new_remaining;
+        }
+
+        // remove the last zero
+        let (remaining, _) = take(1usize)(remaining)?;
+        Ok((remaining, label_sequence))
+    }
 }
 
 //https://datatracker.ietf.org/doc/html/rfc1035#section-3.2
@@ -237,7 +285,6 @@ impl Record {
             data,
         }
     }
-
     pub fn serialize(&self) -> Vec<u8> {
         // Create buffer 512 < | labels 63 bytes | record type 2 bytes | class 2 bytes | ttl 4 bytes | length 2 bytes | data length
         let mut buf = BytesMut::with_capacity(512);
@@ -250,6 +297,9 @@ impl Record {
         buf.put_slice(&self.data);
 
         buf.to_vec()
+    }
+    pub fn deserialize(_data: &[u8]) -> IResult<&[u8], Record> {
+        todo!()
     }
 }
 
