@@ -1,4 +1,4 @@
-// TODO move structs to there own file (The Book pg: 119-140)
+// TODO: move structs to there own file (The Book pg: 119-140)
 use bytes::{BufMut, BytesMut};
 
 //Info on DNS protocol
