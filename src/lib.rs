@@ -69,7 +69,6 @@ impl Header {
     pub fn serialize(&self) -> Vec<u8> {
         // TODO: explicitly set ints to big indian
 
-        // Create the header buffer with a length of 12 bytes
         // 0 bytes | 12 bytes
         let mut buf = BytesMut::with_capacity(96);
 
