@@ -18,6 +18,8 @@ fn main() {
                 }
                 println!(); // Add a newline after printing all bytes
                 let response = test_response().unwrap();
+
+                // TODO: check if response is over 512 bytes and truncate it if so
                 udp_socket
                     .send_to(&response, source)
                     .expect("Failed to send response");
