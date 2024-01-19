@@ -1,6 +1,6 @@
 // TODO: move structs to there own file (The Book pg: 119-140)
 use bytes::{BufMut, BytesMut};
-use nom::{bytes::complete::take, number::complete::be_u16, IResult};
+use nom::{number::complete::be_u16, IResult};
 
 //Info on DNS protocol
 //https://datatracker.ietf.org/doc/html/rfc1035
@@ -105,10 +105,8 @@ impl Header {
 
         buf.to_vec()
     }
-    //https://docs.rs/nom/latest/nom/bytes/complete/fn.take.html#
-    //https://github.com/rust-bakery/nom/blob/main/doc/custom_input_types.md
-    //https://github.com/rust-bakery/nom/blob/main/doc/upgrading_to_nom_5.md
-    fn deserialize(data: &[u8]) -> IResult<&[u8], Header> {
+    //https://docs.rs/nom/latest/nom/number/complete/fn.be_u16.html
+    pub fn deserialize(data: &[u8]) -> IResult<&[u8], Header> {
         let (data, id) = be_u16(data)?;
         let (data, flags) = be_u16(data)?;
         let (data, question_count) = be_u16(data)?;
@@ -144,9 +142,6 @@ impl Header {
             },
         ))
     }
-}
-fn take2(data: &[u8]) -> IResult<&[u8], u16> {
-    be_u16(data)
 }
 
 //https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.2

@@ -18,7 +18,7 @@ fn main() {
                 }
                 println!(); // Add a newline after printing all bytes
 
-                let response = test_response().unwrap();
+                let response = response(&buf).unwrap();
 
                 // TODO: check if response is over 512 bytes and truncate it if so
                 udp_socket
@@ -33,14 +33,63 @@ fn main() {
     }
 }
 
-fn test_response() -> Result<Vec<u8>, String> {
+fn response(buf: &[u8]) -> Result<Vec<u8>, String> {
+    if let Ok((_, header)) = Header::deserialize(buf) {
+        let output_header = Header {
+            id: header.id,
+            query: true,
+            op_code: header.op_code,
+            authoritative_answer: false,
+            truncation: false,
+            recursion_desired: header.recursion_desired,
+            recursion_available: false,
+            reserved: 0,
+            response_code: if header.op_code == 0 { 0 } else { 4 },
+            question_count: 1,
+            answer_count: 1,
+            authority_count: 0,
+            additional_count: 0,
+        };
+        println!("Header: {:?}", output_header);
+        println!("Header: {:?}", output_header.serialize());
+
+        let label_sequence =
+            LabelSequence::new(vec!["codecrafters".to_string(), "io".to_string()])?;
+
+        let question = Question::new(label_sequence.clone(), RecordType::A);
+        println!("Question: {:?}", question);
+        println!("Question: {:?}", question.serialize());
+
+        let answer = Record::new(
+            label_sequence.clone(),
+            RecordType::A,
+            vec![8, 8, 8, 8],
+            None,
+        );
+        println!("Answer: {:?}", answer);
+        println!("Answer: {:?}", answer.serialize());
+
+        let response = [
+            output_header.serialize(),
+            question.serialize(),
+            answer.serialize(),
+        ]
+        .concat();
+        println!("Response: {:?}", &response);
+        Ok(response)
+    } else {
+        Err("Failed to deserialize header".to_string())
+    }
+}
+
+fn _test_response() -> Result<Vec<u8>, String> {
     let header = Header {
         id: 1234,
         query: true,
         op_code: 0,
         authoritative_answer: false,
         truncation: false,
-        recurison_desired: false,
+        recursion_desired: false,
         recursion_available: false,
         reserved: 0,
         response_code: 0,
