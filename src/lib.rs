@@ -1,5 +1,6 @@
 // TODO: move structs to there own file (The Book pg: 119-140)
 use bytes::{BufMut, BytesMut};
+use nom::{bytes::complete::take, number::complete::be_u16, IResult};
 
 //Info on DNS protocol
 //https://datatracker.ietf.org/doc/html/rfc1035
@@ -56,7 +57,7 @@ pub struct Header {
     pub op_code: u8, // 4 bits                  specifies the kind of query in a message.
     pub authoritative_answer: bool, // 1 bit    1 if the responding server "owns" the domain queried, i.e., it's authoritative
     pub truncation: bool, // 1 bit              1 if the message is larger than 512 bytes. always 0 in udp responses.
-    pub recurison_desired: bool, // 1 bit       sender sets this to 1 if the server should recursively resolve this query, 0 otherwise.
+    pub recursion_desired: bool, // 1 bit       sender sets this to 1 if the server should recursively resolve this query, 0 otherwise.
     pub recursion_available: bool, // 1 bit     server sets this to 1 to indicate that recursion is available.
     pub reserved: u8, // 3 bits                 used by dnssec queries. at inception, it was reserved for future use.
     pub response_code: u8, // 4 bits            response code indicating the status of the response.
@@ -85,7 +86,7 @@ impl Header {
         // 0000001000000000
         concatenate |= (self.truncation as u16) << 9;
         // 0000000100000000
-        concatenate |= (self.recurison_desired as u16) << 8;
+        concatenate |= (self.recursion_desired as u16) << 8;
         // 0000000010000000
         concatenate |= (self.recursion_available as u16) << 7;
         // 0000000001110000
@@ -104,6 +105,48 @@ impl Header {
 
         buf.to_vec()
     }
+    //https://docs.rs/nom/latest/nom/bytes/complete/fn.take.html#
+    //https://github.com/rust-bakery/nom/blob/main/doc/custom_input_types.md
+    //https://github.com/rust-bakery/nom/blob/main/doc/upgrading_to_nom_5.md
+    fn deserialize(data: &[u8]) -> IResult<&[u8], Header> {
+        let (data, id) = be_u16(data)?;
+        let (data, flags) = be_u16(data)?;
+        let (data, question_count) = be_u16(data)?;
+        let (data, answer_count) = be_u16(data)?;
+        let (data, authority_count) = be_u16(data)?;
+        let (data, additional_count) = be_u16(data)?;
+
+        let query = (flags >> 15) & 0x01 != 0;
+        let op_code = ((flags >> 11) & 0x0F) as u8;
+        let authoritative_answer = (flags >> 10) & 0x01 != 0;
+        let truncation = (flags >> 9) & 0x01 != 0;
+        let recursion_desired = (flags >> 8) & 0x01 != 0;
+        let recursion_available = (flags >> 7) & 0x01 != 0;
+        let reserved = ((flags >> 4) & 0x07) as u8;
+        let response_code = (flags & 0x0F) as u8;
+
+        Ok((
+            data,
+            Header {
+                id,
+                query,
+                op_code,
+                authoritative_answer,
+                truncation,
+                recursion_desired,
+                recursion_available,
+                reserved,
+                response_code,
+                question_count,
+                answer_count,
+                authority_count,
+                additional_count,
+            },
+        ))
+    }
+}
+fn take2(data: &[u8]) -> IResult<&[u8], u16> {
+    be_u16(data)
 }
 
 //https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.2
