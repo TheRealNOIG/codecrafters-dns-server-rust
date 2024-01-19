@@ -2,6 +2,7 @@
 use bytes::{BufMut, BytesMut};
 
 //Info on DNS protocol
+//https://datatracker.ietf.org/doc/html/rfc1035
 //https://github.com/EmilHernvall/dnsguide/blob/b52da3b32b27c81e5c6729ac14fe01fef8b1b593/chapter1.md
 
 // https://datatracker.ietf.org/doc/html/rfc1035#section-3.2.2
@@ -47,6 +48,7 @@ impl RecordType {
     }
 }
 
+//https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.1
 #[derive(Debug)]
 pub struct Header {
     pub id: u16, // 16 bits                     a random id assigned to query packets. response packets must reply with the same id.
@@ -106,6 +108,7 @@ impl Header {
     }
 }
 
+//https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.2
 #[derive(Debug)]
 pub struct Question {
     pub name: LabelSequence, // Label Sequence  The domain name, encoded as a sequence of labels
@@ -138,6 +141,7 @@ impl Question {
     }
 }
 
+//https://datatracker.ietf.org/doc/html/rfc1035#section-3.1
 #[derive(Debug)]
 pub struct LabelSequence {
     pub labels: Vec<(String, u8)>,
