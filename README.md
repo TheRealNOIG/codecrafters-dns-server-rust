@@ -1,5 +1,5 @@
 
-## This is my solution for CodeCrafters ["Build Your Own DNS server" Challenge](https://app.codecrafters.io/courses/dns-server/overview).
+## This is my solution to the CodeCrafters ["Build Your Own DNS server" Challenge](https://app.codecrafters.io/courses/dns-server/overview).
 
 RFC specification: https://datatracker.ietf.org/doc/html/rfc1035
 
